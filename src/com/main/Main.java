@@ -6,6 +6,7 @@ import com.pi4j.io.serial.*;
 import com.pi4j.util.CommandArgumentParser;
 
 import java.io.Console;
+import java.io.IOException;
 
 /**
  * 核心主方法
@@ -34,6 +35,25 @@ public class Main {
 
         final GpioController gpio = GpioFactory.getInstance();
         final Serial serial = SerialFactory.createInstance();
+
+        // create and register the serial data listener
+        /*
+        serial.addListener(new SerialDataEventListener() {
+            @Override
+            public void dataReceived(SerialDataEvent event) {
+                // NOTE! - It is extremely important to read the data received from the
+                // serial port.  If it does not get read from the receive buffer, the
+                // buffer will continue to grow and consume memory.
+                // print out the data received to the console
+                try {
+                    System.out.println("[HEX DATA]   " + event.getHexByteString());
+                    System.out.println("[ASCII DATA] " + event.getAsciiString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        */
 
         Pin pin_sim868_en = CommandArgumentParser.getPin(RaspiPin.class,RaspiPin.GPIO_07,args);
         sim868_en = gpio.provisionDigitalOutputPin(pin_sim868_en, "pin_sim868_en", PinState.HIGH);
@@ -100,7 +120,7 @@ public class Main {
                         Tools.checkSelf(serial);
                         break;
                     case "5":
-                        System.out.println("***SIM868网络Socket测试***");
+                        System.out.println();System.out.println("***SIM868网络Socket测试***");
                         System.out.println("======================");
                         Tools.gprsTest(serial);
                         break;

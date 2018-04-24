@@ -35,7 +35,7 @@ public class Tools {
         for (String v : vs) {
             if (v.contains(":")) {
                 signal = v.substring(v.indexOf(":") + 1);
-                System.out.println("... catch value:[" + signal.trim() + "]\r\n");
+                //System.out.print("... catch value:[" + signal.trim() + "]\r\n");
             }
         }
         return signal;
@@ -49,26 +49,168 @@ public class Tools {
         sim868_en.setState(PinState.HIGH);
     }
 
-    public static void gprsTest(Serial serial){
-        long i=0;
-        String res = new String(Tools.sendCMD(serial, "AT+CIPSTART=TCP,116.62.192.119,4002"));
-        System.out.println(res);
-        do {
-            res = new String(Tools.sendCMD(serial, "AT+CIPSEND"));
-            if (res.contains(">")) {
-                new String(Tools.sendCMD(serial, String.valueOf(i)));
-                try {
-                    serial.write((byte) 0x1a);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                System.out.println("SIM868无回应，或回应错误");
+    /**
+     * 执行指令, 并在限定时间内等待结果(并加上预期的结尾字串判断)
+     * @param serial
+     * @param cmd           执行的指令
+     * @param endRes        期待的正确结果
+     * @param maxWaitSecond 最大等待时间(秒)
+     * @return
+     */
+    public static String cmdAndWaitResult(Serial serial, String cmd, String endRes, long maxWaitSecond){
+        long timecount = 0;
+        System.out.println("cmdAndWaitResult.cmd:"+cmd);
+        String res = new String(sendCMD(serial, cmd));
+        while(timecount < maxWaitSecond) {
+            if(res.toUpperCase().contains(endRes.toUpperCase())){
+                //System.out.println("cmdAndWaitResult.找到期待结果:"+res);
+                res += new String(listenSerial(serial));
+                break;
+            }
+            res += new String(listenSerial(serial));
+            timecount++;delay(1);
+        }
+        return res;
+    }
+
+    private static void checkGPRSStatus(Serial serial){
+        //res = new String(Tools.sendCMD(serial, "AT+CIPSTATUS"));
+        String res = cmdAndWaitResult(serial, "AT+CIPSTATUS", "STATE", 5);
+        if(!res.contains("INITIAL")){
+            res = cmdAndWaitResult(serial, "AT+CIPSHUT", "SHUT", 5);
+            if(!res.contains("OK")){
+                //调用失败
                 gprsTest(serial);
+            }
+        }
+    }
+
+    public static void gprsTest(Serial serial){
+        //准备网络条件
+        String res = new String(Tools.sendCMD(serial, "AT+CIPSHUT"));   System.out.println(res);
+        res = new String(Tools.sendCMD(serial, "AT+CSTT"));             System.out.println(res);
+        res = new String(Tools.sendCMD(serial, "AT+CIICR"));            System.out.println(res);
+        //此处只要能拿到本机IP, 后面的"CIPSTART"基本上可以100%成功
+        res = new String(Tools.sendCMD(serial, "AT+CIFSR"));            System.out.println(res);        //返回10.121.176.158 或 ERROR
+        //res = new String(Tools.sendCMD(serial, "AT+CIPATS=1,5"));       System.out.println(res);          //设置每5秒自动发送(未成功)
+
+
+        while(true){
+            res = cmdAndWaitResult(serial, "AT+CIPSTART=TCP,116.62.192.119,4002", "CONNECT", 10);
+            System.out.println(res);
+            if(res.contains("FAIL")){
+                //检查状态
+                checkGPRSStatus(serial);
+                continue;
+            }
+
+            if (res.contains("CONNECT OK")) {
+                System.out.println("连接成功!");
+                res = cmdAndWaitResult(serial, "AT+CIPSEND", ">", 10);
+                if (res.contains(">")) {
+                    String v = "aaaaa";
+                    res = cmdAndWaitResult(serial, v, v, 5);
+                    if (res.contains(v)) {
+                        try {
+                            serial.write((byte) 0x1a);
+                            res = cmdAndWaitResult(serial, "\r", "SEND OK", 5);
+                            System.out.println(res);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+
+            delay(1);
+        }
+
+
+
+/*
+        res = new String(Tools.sendCMD(serial, "AT+CIPSTART=TCP,116.62.192.119,4002"));
+        System.out.println(res);
+
+        boolean isconnect = false;
+        if(res!=null && !res.trim().equals("")){
+            //if(res.trim().equals("ERROR")){
+            //    checkSelf(serial);
+            //    gprsTest(serial);
+            //}
+            while (timecount < 10000) {
+                String s = new String(listenSerial(serial));
+                System.out.println("检查连接情况...("+timecount+"):"+s);
+                if(s.contains("CONNECT OK")){
+                    System.out.println("连接成功");
+                    isconnect = true; break;
+                }
+                timecount+=1000;
+            }
+        }
+
+        if(!isconnect) {
+            delay(6);
+            checkSelf(serial);
+            gprsTest(serial);
+        }
+        res = new String(Tools.sendCMD(serial, "AT+CIPSEND"));
+        System.out.println(res);
+        boolean readysend = false;
+        long timecount = 0;
+        while (timecount < 10000) {     //等待输入符">"出现
+            if (res.contains(">")) {
+                readysend = true;
+            }
+            timecount+=1000;
+        }
+
+        //循环发送数据
+        while(readysend){
+
+            res = new String(Tools.sendCMD(serial, "AT+CIPSEND"));
+            System.out.println(res);
+            timecount = 0;
+            while (timecount < 10000) {     //等待输入符">"出现
+                if (res.contains("ERROR")) {
+                    res = new String(Tools.sendCMD(serial, "AT+CIPSTATUS"));
+                    System.out.println(res);
+                }
+                if (res.contains(">")) {
+                    break;
+                }
+                timecount+=1000;
+            }
+
+
+            System.out.print("send data:"+String.valueOf(i));
+            //Tools.sendCMD(serial, String.valueOf(i)+"\r\n");
+            try {
+                //serial.writeln(String.valueOf(i) + "\r\n");
+                serial.write(String.valueOf(i)+"\r");
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+
+                //delay(1);
+                serial.write((byte) 0x1a);
+                System.out.println("...0x1A");
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                System.out.println("listen serial:"+new String(listenSerial(serial)));
+                //res = new String(Tools.sendCMD(serial, "AT+CIPACK"));             System.out.println(res);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
             i++;
             delay(5);
-        }while(true);
+        }
+        System.out.println("SIM868无回应，或回应错误");
+        res = new String(Tools.sendCMD(serial, "AT+CIPSHUT"));
+        System.out.println(res);
+        checkSelf(serial);
+        gprsTest(serial);
+*/
     }
 
     /**
@@ -440,51 +582,61 @@ public class Tools {
      */
     public static boolean initGPRS(Serial serial) {
         if (!serial.isOpen()) {
+            System.out.println("串口未准备好");
             return false;
-        } // 串口未准备好
+        }
 
         //byte[] buffs = new byte[128];
         byte[] buffs;
         try {
-            System.out.println("try send AT to module...");
-            // char cmd[] = {'A', 'T'};
-            // byte cmd[] = "AT".getBytes();
-            // buffs = Tools.sendCMD(serial, "AT".getBytes());
-            System.out.print("\r\nGPRS module testing ...");
+            System.out.println("\r\ninitGPRS ...");
+
+            System.out.print("1.同步波特率...");
             buffs = Tools.sendCMD(serial, "AT");
             String res = new String(buffs);
             if (!res.contains("OK")) {
-                System.out.println("GPRS module is not ready, please check the power and serial port baud rate is correct!");
+                System.out.println("SIM868 is not ready, please check the power and serial port baud rate is correct!");
                 return false;
             }
-            System.out.println(" ...[正常]\r\n");
-            // System.out.println("AT.res:"+res);
+            System.out.println("[DONE]\r\n");
 
-            System.out.print("\r\nTesting SIM card...");
+            System.out.print("\r\n2.查询是否检测到SIM卡...");
             res = new String(Tools.sendCMD(serial, "AT+CPIN?"));
-            System.out.println(res);
             if (!res.contains("READY")) {
-                System.out.println("SIM card is not ready!");
+                System.out.println("[找不到SIM卡]!");
                 return false;
             }
-            System.out.println(" ...[正常]\r\n");
+            System.out.println("[有SIM卡]\r\n");
             // System.out.println("AT+CPIN?.res:"+res);
 
-            System.out.print("\r\nSignal quality testing, the value of 0-31,31 said the best ...");
-            res = new String(Tools.sendCMD(serial, "AT+CSQ"));
+            System.out.print("\r\n3.查询信号质量...");
+            res = new String(Tools.sendCMD(serial, "AT+CSQ"));          //+CSQ: 24,99
             if (res.contains("ERROR")) {
-                System.out.println("Signal quality test failed");
-                return false;
+                System.out.println("[失败]");return false;
             }
-            /* +CSQ: 24,99 */
-            getValueFromString(res);
-            // System.out.println("AT+CSQ.res:"+res);
+            int ig = Integer.parseInt(Tools.getValueFromString(res).split(",")[0].trim());
+            System.out.println("["+ig+"]");
 
+            System.out.print("\r\n4.查询模块是否注册网络...");
+            res = new String(Tools.sendCMD(serial, "AT+CREG?"));        //+CREG: 0,1
+            if (res.contains("ERROR")) {
+                System.out.println("[失败]"); return false;
+            }
+            ig = Integer.parseInt(Tools.getValueFromString(res).split(",")[1].trim());
+            if(ig==1)System.out.println("...["+ig+"],[DONE]");
+            else System.out.println("...["+ig+"]");
+
+            System.out.print("\r\n5.查询模块是否GPRS...");
+            res = new String(Tools.sendCMD(serial, "AT+CGATT?"));       //+CGATT: 1
+            if (res.contains("ERROR")) {
+                System.out.println("[失败]"); return false;
+            }
+            System.out.println("...["+Tools.getValueFromString(res).trim()+"]");
+
+            System.out.print("\r\n6.显示CCID(SIM卡背面20为数字)...");
             res = new String(Tools.sendCMD(serial, "AT+CCID"));
-            System.out.println("AT+CCID.res:" + res);
+            System.out.println(res);
 
-            res = new String(Tools.sendCMD(serial, "AT+CREG?"));
-            System.out.println("AT+CREG.res:" + res);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -493,15 +645,28 @@ public class Tools {
         return true;
     }
 
-
+    /*
+        发送指令给SIM868
+     */
     public static byte[] sendCMD(Serial serial, String cmd) {
-        long overtime = 2 * 1000; // 每条指令超时上限 5秒
-        long timecount = 0; // 计时器
-        byte[] buffs = new byte[128];
-
         try {
             serial.writeln(cmd + "\r");
-            // serial.writeln("AT\r");
+            return listenSerial(serial);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /*
+        监听串口返回的数据
+        每次监听时间上限是2秒
+     */
+    private static byte[] listenSerial(Serial serial){
+        long overtime = 2 * 1000; // 每条指令超时上限 5秒
+        long timecount = 0; // 计时器
+        try {
+            byte[] buffs = new byte[128];
             while (timecount < overtime) {
                 // System.out.print(serial.available());
                 if (serial.available() > 0) {
@@ -512,7 +677,7 @@ public class Tools {
                     }
                     serial.flush();
                     //System.out.println("sendCMD:"+new String(buffs));
-                    if(new String(buffs).contains("OK")) {
+                    if (new String(buffs).contains("OK")) {
                         timecount = overtime; // exit while
                     }
                 }
@@ -520,9 +685,10 @@ public class Tools {
                 Thread.sleep(100);
             }
             // System.out.println("sendCMD:"+new String(buffs));
+            return buffs;
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return buffs;
+        return null;
     }
 }
