@@ -22,7 +22,10 @@ public class Health {
 
     static {
         //静态初始器仅仅在类装载的时候（第一次使用类的时候）执行一次，往往用来初始化静态变量
-        _jedis = new Jedis("192.168.6.3");
+        //_jedis = new Jedis("192.168.6.3");
+        _jedis = new Jedis("linkcloudtech.com", 6579);
+        _jedis.auth("aifei.com");
+        System.out.println("connect to linkcloudtech.com..."+_jedis.isConnected());
     }
     void Health(){
 

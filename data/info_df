@@ -1,0 +1,10 @@
+文件系统          1K-块     已用    可用 已用% 挂载点
+/dev/root      13956968 11311680 1913256   82% /
+devtmpfs         435668        0  435668    0% /dev
+tmpfs            440276     5424  434852    2% /dev/shm
+tmpfs            440276    14572  425704    4% /run
+tmpfs              5120        4    5116    1% /run/lock
+tmpfs            440276        0  440276    0% /sys/fs/cgroup
+/dev/mmcblk0p6    64366    21546   42820   34% /boot
+tmpfs             88056        0   88056    0% /run/user/1000
+/dev/mmcblk0p5    30701      398   28010    2% /media/pi/SETTINGS
