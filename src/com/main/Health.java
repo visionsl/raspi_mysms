@@ -11,6 +11,25 @@ import java.util.Map;
 
 /**
  * 设备健康管理进程
+ *
+     分类:
+     - disk:     磁盘空间
+     - memory:   内存情况
+     - service:  服务状态(live/die/error)
+
+     区域:
+     - office2005: 办公室_2005
+     - office2008: 办公室_2008
+     - aliyun:      阿里云
+
+
+     分类名+设备ID
+     Health_00000000e87df053
+
+     Key的实际结构:
+     ==========================
+     分类.区域.设备ID
+     disk_office2005_00000000e87df053
  *      > 收集指定目录下的df磁盘占用情况的数据,
  */
 public class Health {
