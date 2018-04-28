@@ -42,9 +42,6 @@ public class Health {
     static {
         //静态初始器仅仅在类装载的时候（第一次使用类的时候）执行一次，往往用来初始化静态变量
         //_jedis = new Jedis("192.168.6.3");
-        _jedis = new Jedis("116.62.192.119", 6579);
-        _jedis.auth("aifei.com");
-        System.out.println("connect to linkcloudtech.com..."+_jedis.isConnected());
     }
     void Health(){
 
@@ -53,9 +50,16 @@ public class Health {
     public static void main(String args[]) {
 
         Health health = new Health();
-        if (args.length > 0) {
-            System.out.println("args[0]:"+args[0]);
-            health._info_df_fp = args[0];
+        if (args.length >= 4) {
+            System.out.println("args[3]:"+args[3]);
+            health._info_df_fp = args[3];
+
+            _jedis = new Jedis(args[0], Integer.parseInt(args[1]));
+            _jedis.auth(args[2]);
+            System.out.println("connect to linkcloudtech.com..."+_jedis.isConnected());
+        }else{
+            System.out.println("请输入正确的参数： [redis服务器IP][redis服务器端口][redis服务器密码][df信息文件路径]");
+            return ;
         }
 
         while(true) {
