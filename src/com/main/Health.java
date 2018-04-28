@@ -16,14 +16,14 @@ import java.util.Map;
 public class Health {
     //Redis
     static Jedis _jedis;
-    final static String _redis_Health_df_key = "Health_df";
-    private static int _info_df_maxv = 80;  //磁盘占用超过x%后提交上传
+    final static String _redis_Health_df_key = "disk_office2005";
+    private static int _info_df_maxv = 20;  //磁盘占用超过x%后提交上传
     private String _info_df_fp;             //df信息文件路径, 在第1个参数中指定 args[0]
 
     static {
         //静态初始器仅仅在类装载的时候（第一次使用类的时候）执行一次，往往用来初始化静态变量
         //_jedis = new Jedis("192.168.6.3");
-        _jedis = new Jedis("linkcloudtech.com", 6579);
+        _jedis = new Jedis("116.62.192.119", 6579);
         _jedis.auth("aifei.com");
         System.out.println("connect to linkcloudtech.com..."+_jedis.isConnected());
     }
@@ -56,6 +56,7 @@ public class Health {
      */
     private static void scan_info_df(Health health) {
         try {
+            String rediskey = _redis_Health_df_key+"_00000000e87df053";
             FileReader fr = new FileReader(health._info_df_fp);
             BufferedReader br = new BufferedReader(fr);
             String str2 = br.readLine();        //第一行是标题, 没有用处, 读出后不处理
@@ -74,9 +75,9 @@ public class Health {
                 if(pre >= Health._info_df_maxv){
                     //此处拿到有用的数据:vs6[5]-挂载点 ; vs6[4]-已用%
                     //System.out.print(vs6[5]);System.out.print("\t");System.out.print(vs6[4]);
-                    Map<String, String> hmapget = _jedis.hgetAll("Health_00000000e87df053");
+                    Map<String, String> hmapget = _jedis.hgetAll(rediskey);
                     int inits = hmapget.size();
-                    hmapget.put(_redis_Health_df_key+"_"+vs6[5], String.valueOf(pre));
+                    hmapget.put(vs6[5].replace("/", "__"), String.valueOf(pre));
 
                     Iterator<Map.Entry<String, String>> it = hmapget.entrySet().iterator();
                     while (it.hasNext()) {
@@ -89,11 +90,11 @@ public class Health {
 
                     if(inits>hmapget.size()) {
                         System.out.println("redis.hmapget: 变小, 移除旧redis, 重新写入");
-                        _jedis.del("Health_00000000e87df053");
+                        _jedis.del(rediskey);
                     }
-                    _jedis.hmset("Health_00000000e87df053", hmapget);
+                    _jedis.hmset(rediskey, hmapget);
                     int ot = 60 * 60;      //过期时间: 1小时
-                    _jedis.expire("Health_00000000e87df053", ot);
+                    _jedis.expire(rediskey, ot);
                     System.out.println("redis.hmapget:"+hmapget.toString());
                 }
 
