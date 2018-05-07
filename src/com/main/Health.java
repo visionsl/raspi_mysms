@@ -1,5 +1,6 @@
 package com.main;
 
+import com.common.FileUtil;
 import redis.clients.jedis.Jedis;
 
 import java.io.BufferedReader;
@@ -38,10 +39,12 @@ public class Health {
     final static String _redis_Health_df_key = "disk_office2005";
     private static int _info_df_maxv = 20;  //磁盘占用超过x%后提交上传
     private String _info_df_fp;             //df信息文件路径, 在第1个参数中指定 args[0]
+    private static String _cpu_serial;             //CPU序列号
 
     static {
         //静态初始器仅仅在类装载的时候（第一次使用类的时候）执行一次，往往用来初始化静态变量
         //_jedis = new Jedis("192.168.6.3");
+        _cpu_serial = getCpuserial();
     }
     void Health(){
 
@@ -73,13 +76,35 @@ public class Health {
 
     }
 
+    private static String getCpuserial(){
+        /**读取CPU序列号**/
+        String fn = "/proc/cpuinfo";
+        String fc = FileUtil.getFileContent(fn);
+        if(fc==null){
+            System.out.println("can't found :"+fn);
+            return null;
+        }
+        if(!fc.trim().equals("")){
+            fc = fc.substring(fc.indexOf("Serial"));
+            fc = fc.substring(fc.indexOf(":")+1);
+            if(fc!=null){
+                System.out.println(fc.trim());
+                return fc.trim();
+            }
+        }else{
+            //读取CPU序列号失败, 直接退出
+            System.out.println("读取CPU序列号失败");
+        }
+        return null;
+    }
+
     /*
         扫描DF信息文件(该文件由系统定时自动生成/更新)
         把磁盘占用大于指定百分比的数据上传到Redis服务器(有效存留时间是1小时)
      */
     private static void scan_info_df(Health health) {
         try {
-            String rediskey = _redis_Health_df_key+"_00000000e87df053";
+            String rediskey = _redis_Health_df_key+"_"+_cpu_serial;
             FileReader fr = new FileReader(health._info_df_fp);
             BufferedReader br = new BufferedReader(fr);
             String str2 = br.readLine();        //第一行是标题, 没有用处, 读出后不处理
@@ -94,6 +119,7 @@ public class Health {
                     }
                 }
                 //for(String v : vs6){System.out.print(v.trim()); System.out.print("\t"); }
+                if(null == vs6[4]){System.out.println("vs6[4]:"+vs6[4]);return;}
                 int pre = Integer.parseInt(vs6[4].substring(0, vs6[4].indexOf("%")));
                 if(pre >= Health._info_df_maxv){
                     //此处拿到有用的数据:vs6[5]-挂载点 ; vs6[4]-已用%
