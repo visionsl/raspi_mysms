@@ -7,27 +7,29 @@ import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Common {
 	//开发/运行模式
-	public static final int RUNMODE = 1;		//0-开发模式; 1-运行模式
-	/**继电器控制**/
-	public static final String CODE_SET_RELAY = "001";
-	/**获取土壤数据**/
-	public static final String CODE_GET_SOIL_MOISTURE = "002";
-	/**获取人体活动传感数据**/
-	public static final String CODE_GET_HUMAN = "003";
-	/**LED控制**/
-	public static final String CODE_SET_LED = "004";
-	/**舵机控制**/
-	public static final String CODE_SET_SERVO = "005";
+	//public static final int RUNMODE = 1;		//0-开发模式; 1-运行模式
+	/*继电器控制*/
+	//public static final String CODE_SET_RELAY = "001";
+	/*获取土壤数据*/
+	//public static final String CODE_GET_SOIL_MOISTURE = "002";
+	/*获取人体活动传感数据*/
+	//public static final String CODE_GET_HUMAN = "003";
+	/*LED控制*/
+	//public static final String CODE_SET_LED = "004";
+	/*舵机控制*/
+	//public static final String CODE_SET_SERVO = "005";
 
 	
 
-	/**
+	/*
 	 * 计算2点间的直线距离(单位为米), 忽略地球是圆的问题,也忽略地理上的障碍物因素
 	 * @param lat1
 	 * @param lng1
@@ -55,7 +57,7 @@ public class Common {
 	}
 	
 	
-	/**
+	/*
      * 提供精确的小数位四舍五入处理。
      * @param v 需要四舍五入的数字
      * @param scale 小数点后保留几位
@@ -68,7 +70,7 @@ public class Common {
 		return b.divide(one,scale,BigDecimal.ROUND_HALF_UP).doubleValue();
 	}
 
-	/**
+	/*
 	 * Re-maps a number from one range to another. That is, a value of fromLow would get mapped to toLow, a value of fromHigh to toHigh, values in-between to values in-between, etc.
 	 * @param x
 	 * @param in_min
@@ -81,7 +83,7 @@ public class Common {
 		  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 	}
 	
-    /**
+    /*
      * 执行简单命令
      * @param cmd	命令
      * @param tp		1-只执行不返回结果  0-执行并返回结果
@@ -89,34 +91,43 @@ public class Common {
      * 			if tp==1    执行成功返回1，失败返回－1
      * 			if tp==0	   返回执行（输出）结果
      */
-    public static String runCommand(String cmd,int tp){
+    public static List<String> runCommand(String[] cmd,int tp){
     	StringBuffer buf = new StringBuffer(1000);
-    	String rt="-1";
+    	//String[] rt; //{"-1"};
+        List<String> rt = new ArrayList();
     	try{
+			System.out.println();System.out.print("test code:");
+			for(String c : cmd){System.out.print(c+"\t");}
+			System.out.println();
+
     		Process pos = Runtime.getRuntime().exec(cmd);
-    		pos.waitFor();
+            pos.waitFor();
     		if(tp==1){
     			if(pos.exitValue()==0){
-    				rt="1";
-    			}
+    				rt.add("1");
+    			}else{
+                    rt.add("-1");
+                }
     		}else{
+                System.out.println("输出结果:");
     			InputStreamReader ir = new InputStreamReader(pos.getInputStream());
     		    LineNumberReader input = new LineNumberReader(ir);
     		    String ln="";
     		    while ((ln =input.readLine()) != null) {
-    		        buf.append(ln+"<br>");
+    		        //buf.append(ln+"<br>");
+                    rt.add(ln);
     		    }
-    		    rt = buf.toString();
+    		    //rt = buf.toString();
     		    input.close();
     		    ir.close();
     		}
     	}catch(Exception e){
-    		rt=e.toString();
+    		rt.add(e.toString());
     	}
     	return rt;
     }
     
-	/**
+	/*
 	 * json输出工具方法
 	 * @param o 要转成json的对象
 	 */
@@ -129,7 +140,7 @@ public class Common {
 		return null;
 	}
 	
-	/**
+	/*
 	 * 判断字串是否数字
 	 * @param str		目标字串
 	 * @return			返回布尔值

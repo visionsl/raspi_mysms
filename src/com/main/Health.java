@@ -6,6 +6,7 @@ import redis.clients.jedis.Jedis;
 
 import java.io.*;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,6 +36,7 @@ public class Health {
     //Redis
     static Jedis _jedis;
     final static String _redis_Health_df_key = "disk_office2005";
+    final static String _redis_Health_proc_key = "proc_office2005";
     private static double _info_df_maxv = 20.0;  //磁盘占用超过x%后提交上传
     private String _info_df_fp;             //df信息文件路径, 在第1个参数中指定 args[0]
     private static String _cpu_serial;             //CPU序列号
@@ -49,8 +51,16 @@ public class Health {
     }
 
     public static void main(String args[]) {
+        System.out.println("输入正确的参数： [redis服务器IP][redis服务器端口][redis服务器密码][df信息文件路径]" +
+                "[[可选]检测进程名称1][[可选]检测进程名称2]...");
 
         Health health = new Health();
+        for(int i=0; i<args.length; i++){
+            System.out.println("参数["+i+"]"+args[i]);
+            if("-h".equals(args[i])){
+                return ;
+            }
+        }
         if (args.length >= 4) {
             System.out.println("args[3]:"+args[3]);
             health._info_df_fp = args[3];
@@ -59,11 +69,15 @@ public class Health {
             _jedis.auth(args[2]);
             System.out.println("connect to linkcloudtech.com..."+_jedis.isConnected());
         }else{
-            System.out.println("请输入正确的参数： [redis服务器IP][redis服务器端口][redis服务器密码][df信息文件路径]");
             return ;
         }
 
+
         while(true) {
+            //检查指定进程是否正在(ps -aux)
+            if(args.length>=5){
+                checkProcess(args);
+            }
 
             //扫描DF信息文件
             scan_info_df(health);
@@ -74,9 +88,44 @@ public class Health {
 
     }
 
+    /**
+     * 检查指定进程是否正在(ps -aux)
+     * @param args  进程名/关键字, 从第[4]个参数开始是进程名称
+     */
+    private static void checkProcess(String args[]){
+        System.out.println("args.length:"+args.length);
+        if(args.length<5){
+            System.out.println("未指定进程名称/关键字");return ;
+        }
+        List<String> cmds = Common.runCommand(new String[]{"ps", "-aux"}, 0);
+
+        for(int x=4; x<args.length; x++) {
+            boolean isexist = false;
+            for(String c : cmds){
+                if(c.toLowerCase().indexOf(args[x].toLowerCase())!=-1) {
+                    isexist = true;
+                    System.out.println(c);
+                }
+            }
+            String rediskey = _redis_Health_proc_key+"_"+args[x]+"_"+_cpu_serial;
+            if(isexist){
+                System.out.println("进程["+args[x]+"]存在");
+                _jedis.setex(rediskey, 10*60, "1");
+            }else{
+                System.out.println("进程["+args[x]+"]不存在!!!!!");
+                _jedis.setex(rediskey, 10*60, "0");
+            }
+        }
+    }
+
+    /**
+     * 获取CPU温度
+     * @return
+     */
     private static String getCpuTemprature(){
         String fn = "/sys/class/thermal/thermal_zone0/temp";
         String fc = FileUtil.getFileContent(fn);
+        if(null==fc || "".equals(fc.trim())){return "0";}
         double t = Double.parseDouble(fc)/1000;
         return String.valueOf(t);
     }
@@ -121,10 +170,11 @@ public class Health {
         return null;
     }
 
-    /*
-        扫描DF信息文件(该文件由系统定时自动生成/更新)
+    /**
+        扫描DF信息文件(该文件由系统定时自动生成/更新), 类似这样: crontab -e
+            * /30 * * * *  df > /data/logs/df_info
         把磁盘占用大于指定百分比的数据上传到Redis服务器(有效存留时间是1小时)
-     */
+     **/
     private static void scan_info_df(Health health) {
         try {
             String rediskey = _redis_Health_df_key+"_"+_cpu_serial;
